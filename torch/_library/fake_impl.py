@@ -6,7 +6,11 @@ from collections.abc import Callable
 from typing_extensions import deprecated
 
 import torch
-from torch._library.utils import Kernel, RegistrationHandle
+from torch._library.utils import (
+    Kernel,
+    lookup_op,
+    RegistrationHandle,
+)
 
 
 log = logging.getLogger(__name__)
@@ -78,13 +82,21 @@ class FakeImplHolder:
         # Store the kernel in this holder
         kernel = Kernel(func, source)
         self.kernels.append(kernel)
+        schema = lookup_op(self.qualname)._schema
 
         def deregister_fake_kernel():
             self.kernels.remove(kernel)
+            if not self.kernels:
+                torch._C._fake_dispatch_deregister_custom_op_impl(
+                    schema.name, schema.overload_name
+                )
 
         meta_kernel = construct_meta_kernel(self.qualname, self)
         try:
             lib.impl(self.qualname, meta_kernel, "Meta", allow_override=allow_override)
+            torch._C._fake_dispatch_register_custom_op_impl(
+                schema.name, schema.overload_name
+            )
         except Exception:
             log.info(
                 "Failed to register fake_impl '%s':",
@@ -123,6 +135,17 @@ def construct_meta_kernel(qualname: str, fake_impl_holder: FakeImplHolder) -> Ca
             return fake_impl_holder.kernel(*args, **kwargs)
 
     return meta_kernel
+
+
+def run_fake_impl(fake_mode, func, *args, **kwargs):
+    fake_impl = torch._library.simple_registry.singleton.find(
+        func.name()
+    ).fake_impl.kernel
+    if fake_impl is None:
+        raise AssertionError(f"expected a fake implementation for {func}")
+    ctx = FakeImplCtx(fake_mode, func)
+    with set_ctx_getter(lambda: ctx), fake_mode:
+        return fake_impl(*args, **kwargs)
 
 
 def get_none():
