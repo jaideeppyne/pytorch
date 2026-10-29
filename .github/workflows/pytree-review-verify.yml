@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p proof
           git apply .github/pytree-review.patch
-          python -m pip install uv spin pyyaml packaging typing_extensions setuptools wheel numpy expecttest hypothesis optree psutil
+          python -m pip install uv spin pyyaml packaging typing_extensions setuptools wheel numpy expecttest hypothesis optree psutil unittest-xml-reporting
       - name: Repository lint on changed files
         run: |
           spin lint -a -- test/test_pytree.py torch/utils/_pytree.py torch/fx/immutable_collections.py 2>&1 | tee proof/lint.log
