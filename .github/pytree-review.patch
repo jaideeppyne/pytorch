@@ -73,7 +73,7 @@ index 9b65499..58e0bfa 100644
 +    def test_pytree_serialize_tuple_key_is_backward_compatible(self, pytree):
 +        tree = {"a": 0, "b": 1}
 +        spec = pytree.tree_structure(tree)
-+        expected = '[1, {"type": "builtins.dict", "context": "[\\"a\\", \\"b\\"]", "children_spec": [{"type": null, "context": null, "children_spec": []}, {"type": null, "context": null, "children_spec": []}]}]'  # noqa: B950
++        expected = '[1, {"type": "builtins.dict", "context": "[\\"a\\", \\"b\\"]", "children_spec": [{"type": null, "context": null, "children_spec": []}, {"type": null, "context": null, "children_spec": []}]}]'
 +        self.assertEqual(pytree.treespec_dumps(spec), expected)
 +        old_spec = pytree.treespec_loads(expected)
 +        self.assertEqual(old_spec, spec)
