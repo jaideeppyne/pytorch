@@ -1,0 +1,49 @@
+name: Verify reviewed pytree follow-up
+on:
+  push:
+    branches: [verify/pytree-review-oct29]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply reviewed patch and install test tools
+        run: |
+          mkdir -p proof
+          git apply .github/pytree-review.patch
+          python -m pip install uv spin pyyaml packaging typing_extensions setuptools wheel numpy expecttest hypothesis optree psutil
+      - name: Repository lint on changed files
+        run: |
+          spin lint -a -- test/test_pytree.py torch/utils/_pytree.py torch/fx/immutable_collections.py 2>&1 | tee proof/lint.log
+          git diff --binary -- test/test_pytree.py torch/utils/_pytree.py torch/fx/immutable_collections.py > proof/validated.patch
+      - name: Install CPU runtime
+        run: python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+      - name: Test exact Python sources with CPU wheel runtime
+        run: |
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          import os, pathlib, shutil, torch
+          source = pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          installed = pathlib.Path(torch.__file__).parent
+          print('CPU runtime:', torch.__version__)
+          for name in ['utils/_pytree.py', 'utils/_cxx_pytree.py', 'fx/immutable_collections.py']:
+              shutil.copyfile(source / 'torch' / name, installed / name)
+          shutil.copyfile(source / 'test/test_pytree.py', pathlib.Path.cwd() / 'test_pytree_review.py')
+          PY
+          python test_pytree_review.py -v 2>&1 | tee "$GITHUB_WORKSPACE/proof/pytree-tests.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytree-review-proof
+          path: proof
