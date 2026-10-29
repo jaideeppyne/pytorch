@@ -243,3 +243,5 @@ index 0e03021..e1b08ca 100644
 +        _json_unescape_tuples(key) for key in dumpable_context["dict_context"]
 +    ]
      return [default_factory, dict_context]
+ 
+ 
